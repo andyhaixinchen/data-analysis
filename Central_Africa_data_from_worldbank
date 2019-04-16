@@ -1,0 +1,208 @@
+"""
+Created on Tue Dec 11 16:08:46 2018
+
+@author: Andy Chen 
+
+Working Directory: D:\Python
+"""
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+pd.set_option('display.max_row', None)
+pd.set_option('display.max_columns', None)
+
+full_data = pd.read_excel('world_data_hult_regions.xlsx')
+full_data.rename(columns= 
+                        {'CO2_emissions_per_capita)' : 
+                        'co2_emissions_per_capita'},
+                        inplace = True)
+full_data.index = full_data['country_name']
+full_data = full_data.drop(columns = 'country_name')
+full_data = full_data.drop(['World'])
+
+
+central_africa_2 = full_data[full_data['Hult_Team_Regions'].str.contains('Central Africa 2')]
+central_africa_1 = full_data[full_data['Hult_Team_Regions'] == 'Central Aftica 1']
+central_africa = central_africa_2.merge(central_africa_1, how='outer')
+
+
+###############################################################################
+# Imputing missing values with medians
+###############################################################################
+
+for col in central_africa_2:
+    no_of_nulls = central_africa_2[col].isnull().sum()
+    if no_of_nulls > 0 and no_of_nulls <= 2:
+        col_median = central_africa[col].median()
+        central_africa_2[col] = central_africa_2[col].fillna(col_median)
+            
+###############################################################################
+# Checking outliers
+###############################################################################
+
+for col in central_africa_2.loc[:,['co2_emissions_per_capita','avg_air_pollution','urban_population_pct','urban_population_growth_pct']]:
+    """ plotting boxplots for selected columns in central_africa_2 """
+    central_africa_2.boxplot(column = [col],
+                 vert = False,
+                 manage_xticks = True,
+                 patch_artist = True,
+                 meanline = False,
+                 showmeans = True)
+    plt.title(f'Boxplot of {str(col)}')
+    plt.tight_layout()
+    plt.show()
+
+nout_co2_per_capita = 2
+nout_air_pollution = 1
+nout_urban_pop_growth_pct = 3
+
+print (f"""
+       There are {str(nout_co2_per_capita)} outliers in CO2 Emissions per capita, {str(nout_air_pollution)} outlier in Air Pollution, and {str(nout_urban_pop_growth_pct)} outliers in Urban Population Growth Percentage.
+       """ )
+
+outlier_co2_per_capita = pd.DataFrame(central_africa_2['co2_emissions_per_capita'].sort_values(ascending = False).head(nout_co2_per_capita))
+outlier_avg_air_pollution = pd.DataFrame(central_africa_2['avg_air_pollution'].sort_values(ascending = False).head(nout_air_pollution))
+outlier_urban_population_growth_pct = pd.DataFrame(central_africa_2['urban_population_growth_pct'].sort_values(ascending = False).iloc[[0,1,-1]])
+
+print (outlier_co2_per_capita)
+print (outlier_avg_air_pollution)
+print (outlier_urban_population_growth_pct)
+
+
+
+#######################################################
+# Compare Central Africa 2 and the world
+########################################################
+
+# Used for slide 19
+
+for col in central_africa_2[['co2_emissions_per_capita','avg_air_pollution','urban_population_pct','urban_population_growth_pct']]:
+    """ Check if there is any value that rank top 1 in the world """
+    
+    if central_africa[col].max() == full_data[col].max():
+        print(f'There is a world max in {str(col)}')
+    elif central_africa[col].min() == full_data[col].min():
+        print (f'There is a world min in {str(col)}')        
+
+
+
+
+for col in central_africa_2.loc[:,['co2_emissions_per_capita','avg_air_pollution','urban_population_pct','urban_population_growth_pct']]:
+    """ Plot distribution of variables with 90% and 10% threshhold lines """
+    high = full_data[col].quantile(0.9)
+    low = full_data[col].quantile(0.1)
+    median_world = full_data[col].quantile(0.5)
+    median_central_africa_2 = central_africa_2[col].quantile(0.5)
+    
+    
+    sns.distplot(central_africa_2[col],
+                 bins = 'fd',
+                 kde = True,
+                 rug = False)
+    
+   
+    plt.title(f'Histogram and trend for {str(col)}')
+    plt.axvline(x = high, label = 'High Outlier Threshold', linestyle = '--')
+    plt.axvline(x = low, label = 'Low Outlier Threshold', linestyle = '--')
+    plt.axvline(x = median_world, label = 'Central Africa Median Threshold', color = 'b')
+    plt.axvline(x = median_central_africa_2, label = 'Central Africa 2 Median Threshold', color = 'red')
+    plt.tight_layout()
+    plt.show()
+
+
+co2_world = round(1-(central_africa_2['co2_emissions_per_capita'].median())/(full_data['co2_emissions_per_capita'].median()),2)
+air_pollution_world = round(((central_africa_2['avg_air_pollution'].median()))/(full_data['avg_air_pollution'].median())-1,2)
+urban_pop_world = round(1-(central_africa_2['urban_population_pct'].median())/(full_data['urban_population_pct'].median()),2)
+urban_pop_growth_world = round((central_africa_2['urban_population_growth_pct'].median())/(full_data['urban_population_growth_pct'].median())-1,2)
+
+print (f"""
+      1. The light-blue dashed lines on the left ad right represent 10% and 90% quantile of Central Africa. The dark-blue line represents the world median. The red line in the middle represents the median of Central Africa 2.   
+      
+      2. Median of CO2 emission is {round(central_africa_2['co2_emissions_per_capita'].median(),2)}.
+      
+         Median of Average air pollution is {central_africa_2['avg_air_pollution'].median()}.
+      
+         We find out that the median of CO2 emission is {co2_world*100}% lower than the world.
+         Average air pollution in Central Africa 2 is {air_pollution_world*100}%  higher than the world.
+      
+      3. Urban population percentage is {round((full_data['urban_population_pct'].median()),2)}. 
+      
+         Urban population growth percentage is {round(central_africa_2['urban_population_growth_pct'].median(),2)}.
+      
+         We find out that Urban population percentage is {urban_pop_world*100}% lower than the world.
+         Urban population growth percentage is {urban_pop_growth_world*100}% higher than the world.
+      
+      4. Urban population growth percentage is {round(central_africa_2['urban_population_growth_pct'].median()/2.815436536,2)} times of China.
+      """)
+
+
+
+
+
+###############################################################################
+# Saving things for future use
+###############################################################################
+
+# Grpagh on page 18 
+median_co2_world = full_data['co2_emissions_per_capita'].quantile(0.5)
+sns.distplot(central_africa_2['co2_emissions_per_capita'],
+             bins = 'fd',
+             kde = True,
+             rug = False)   
+plt.title(f'CO2 Emission \nin Central Africa 2, 2014')
+plt.axvline(x = median_co2_world, label = 'Central Africa Median Threshold', color = 'r')
+plt.tight_layout()
+plt.savefig('CO2 Emission of Central Africa.png')
+
+
+
+
+# Grpagh on page 19 
+plt.subplot(2,2,1)
+median_air_pollution_world = full_data['urban_population_growth_pct'].quantile(0.5)
+sns.distplot(central_africa_2['urban_population_growth_pct'],
+             bins = 'fd',
+             kde = True,
+             rug = False,
+             color = 'orange')
+plt.title(f'Urbanization Population Growth \nin Central Africa 2, 2014')
+plt.axvline(x = median_air_pollution_world, label = 'Central Africa Median Threshold', color = 'r')
+plt.tight_layout()
+
+plt.subplot(2,2,3)
+median_air_pollution_world = full_data['urban_population_pct'].quantile(0.5)
+sns.distplot(central_africa_2['urban_population_pct'],
+             bins = 'fd',
+             kde = True,
+             rug = False,
+             color = 'purple')
+plt.title(f'Urbanization Population Growth \nin Central Africa 2, 2014')
+plt.axvline(x = median_air_pollution_world, label = 'Central Africa Median Threshold', color = 'r')
+plt.tight_layout()
+
+plt.savefig('Urbanization of Central Africa 2 vs the World.png')
+
+
+
+
+# Grpagh on page 20 
+central_africa_2.loc[:,'Urban Population Growth Group'] = 0
+central_africa_2.loc['Central African Republic','Urban Population Growth Group'] = 1
+central_africa_2['Urban Population Growth Group'] = central_africa_2['Urban Population Growth Group'].map(
+        {0: 'Fast Growth',
+         1: 'Slow Growth'})
+        
+        
+sns.lmplot(x = 'urban_population_pct',
+           y = 'urban_population_growth_pct',
+           data = central_africa_2,
+           fit_reg = True,
+           hue= 'Urban Population Growth Group',
+           scatter_kws= {"marker": "D", 
+                        "s": 30},
+           palette = 'plasma')
+plt.title("Urban Population Growth Percentage, 2014")
+plt.grid()
+plt.tight_layout()
+plt.savefig('Urban Population Growth Percentage, 2014.png')
