@@ -193,7 +193,7 @@ central_africa_2['Urban Population Growth Group'] = central_africa_2['Urban Popu
         {0: 'Fast Growth',
          1: 'Slow Growth'})
         
-        
+         
 sns.lmplot(x = 'urban_population_pct',
            y = 'urban_population_growth_pct',
            data = central_africa_2,
